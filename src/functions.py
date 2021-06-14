@@ -59,17 +59,16 @@ class Functions:
         df['WeekofMonth'] = df['Date'].apply(lambda x: pendulum.parse(x).week_of_month)
         df['WeekofYear'] = df['Date'].apply(lambda x: pendulum.parse(x).week_of_year)
         df['Date'] = pd.to_datetime(df['Date'])
-        df['Year'] = df['Date'].dt.year
+        #df['Year'] = df['Date'].dt.year
         df['Month'] = df['Date'].dt.month
         df['Week'] = df['Date'].dt.week
         df['Day'] = df['Date'].dt.day
         
         if dummy:
+            df = pd.get_dummies(df, columns=["WeekofMonth"])
+            df = pd.get_dummies(df, columns=["WeekofYear"])
+            df = pd.get_dummies(df, columns=["Date"])
             df = pd.get_dummies(df, columns=["Month"])
-            df = pd.get_dummies(df, columns=["Month"])
-            df = pd.get_dummies(df, columns=["Week"])
-            df = pd.get_dummies(df, columns=["Week"])
-            df = pd.get_dummies(df, columns=["Day"])
             df = pd.get_dummies(df, columns=["Day"])
         
         return df
@@ -148,16 +147,25 @@ class Functions:
         return df
     
     
-    def createDateStatsFeatures(df, variable, gp_cols, target='Weekly_Sales', funcs={'mean':np.mean,
-                                                                                 'median':np.median,
-                                                                                 'max':np.max,
-                                                                                 'min':np.min,
-                                                                                 'std':np.std}):
+    def createDateStatsFeatures(df, variable, gp_cols, target='Weekly_Sales', funcs=['mean','median','max','min','std','sum']):
+        
+        '''create data aggregate features
+        Args:
+            df : DataFrame
+            variable : str
+            gp_cols : list
+            target : str
+            funcs : list
+        Return:
+            DataFrame
+        
+        '''
+        
         train_df = df.loc[~(df.train_or_test=='test'), :]
         gp = train_df.groupby(gp_cols)
         newdf = df[gp_cols].drop_duplicates().reset_index(drop=True)
-        for name, func in funcs.items():
+        for func in funcs:
             tmp = gp[target].agg(func).reset_index()
-            tmp.rename(columns={target:variable + name}, inplace=True)
+            tmp.rename(columns={target:variable + func}, inplace=True)
             newdf = newdf.merge(tmp, on=gp_cols, how='left')
         return df.merge(newdf, on=gp_cols, how='left')
