@@ -56,9 +56,9 @@ class Functions:
         '''
         
         import pendulum
-        df['Date'] = pd.to_datetime(df['Date'])
         df['WeekofMonth'] = df['Date'].apply(lambda x: pendulum.parse(x).week_of_month)
         df['WeekofYear'] = df['Date'].apply(lambda x: pendulum.parse(x).week_of_year)
+        df['Date'] = pd.to_datetime(df['Date'])
         df['Year'] = df['Date'].dt.year
         df['Month'] = df['Date'].dt.month
         df['Week'] = df['Date'].dt.week
@@ -72,7 +72,7 @@ class Functions:
             df = pd.get_dummies(df, columns=["Day"])
             df = pd.get_dummies(df, columns=["Day"])
         
-        return
+        return df
     
     @staticmethod
     def getColumnsDiff(A, B):
@@ -103,3 +103,61 @@ class Functions:
         
         df[col_name] = pd.to_datetime(df[col_name])
         return df[col_name]
+    
+    @staticmethod
+    def rollingInterpolation(features, roll=16):
+        
+        '''interpolating CPI and Unemployment by rolling
+        Args:
+            features : DataFrame
+            roll : int
+        Return:
+            DataFrame
+        
+        '''
+        
+        stores_list = list(range(1,46))
+        for store in stores_list:
+            tmp = features[features['Store'] == store]
+            tmp.Date = pd.to_datetime(tmp.Date)
+            tmp = tmp.set_index('Date')
+
+            features.loc[(features.Store == store),['CPI']] = list(tmp.CPI.fillna(tmp.CPI.rolling(roll,min_periods=1).mean()))
+            features.loc[(features.Store == store),['Unemployment']] = list(tmp.Unemployment.fillna(tmp.Unemployment.rolling(roll,min_periods=1).mean()))
+            
+        return features
+    
+    
+    def createLagFeatures(df, gp_cols=['Store','Dept'], target='Weekly_Sales', lags=[52, 104]):
+        
+        '''create lag feature
+        Args:
+            df : DataFrame
+            gp_cols : list
+            target : str
+            lags : list
+        Return:
+            DataFrame
+        
+        '''
+        
+        gp = df.groupby(gp_cols)
+        for i in lags:
+            df['_'.join([target, 'LagFeat', str(i)])] = gp[target].shift(i).values
+
+        return df
+    
+    
+    def createDateStatsFeatures(df, variable, gp_cols, target='Weekly_Sales', funcs={'mean':np.mean,
+                                                                                 'median':np.median,
+                                                                                 'max':np.max,
+                                                                                 'min':np.min,
+                                                                                 'std':np.std}):
+        train_df = df.loc[~(df.train_or_test=='test'), :]
+        gp = train_df.groupby(gp_cols)
+        newdf = df[gp_cols].drop_duplicates().reset_index(drop=True)
+        for name, func in funcs.items():
+            tmp = gp[target].agg(func).reset_index()
+            tmp.rename(columns={target:variable + name}, inplace=True)
+            newdf = newdf.merge(tmp, on=gp_cols, how='left')
+        return df.merge(newdf, on=gp_cols, how='left')
