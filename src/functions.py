@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 
 class Functions:
     def __init__(self):
@@ -169,3 +170,41 @@ class Functions:
             tmp.rename(columns={target:variable + func}, inplace=True)
             newdf = newdf.merge(tmp, on=gp_cols, how='left')
         return df.merge(newdf, on=gp_cols, how='left')
+    
+    
+    def createClusteredFeatures(df, num_clusters=[3, 5, 10, 15, 20], remove_cols=['Date', 'Store', 'Dept', 'train_or_test']):
+        
+        '''create data clustered features
+        Args:
+            df : DataFrame
+            num_clusters : list
+            remove_cols : list
+        Return:
+            DataFrame
+        
+        '''
+ 
+        cols = list(df.columns[df.isnull().any() == False])
+
+        for remove_col in remove_cols:
+            cols.remove(remove_col)
+
+        for num_cluster in num_clusters:
+
+            KM = KMeans(n_clusters = num_cluster, random_state = 0, n_jobs = -1)
+            KM.fit(df.loc[:, cols])
+            km_pred = KM.predict(df.loc[:, cols])
+            km_distance = KM.transform(df.loc[:, cols])
+
+            for clst in range(0, num_cluster):
+                df['Labels_{nums}_{clst}_distance'.format(nums=num_cluster, clst=clst)] = km_distance[:, clst]
+
+            df['Labels_{}'.format(num_cluster)] = km_pred
+            df =  Functions.createDateStatsFeatures(df, 'Labels_{}_Sales_'.format(num_cluster), ['Store','Dept', 'Labels_{}'.format(num_cluster)])
+
+            unique, count = np.unique(km_pred, return_counts=True)
+            print('-'*10, num_cluster, ' cluster', '-'*10)
+            for i in range(0, len(count)):
+                print('Cluster : ', unique[i], 'Nums : ', count[i])
+                
+        return df
