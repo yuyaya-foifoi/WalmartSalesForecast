@@ -24,12 +24,19 @@ Hardware Overview:
 ```
 
 
-## Libraries
+## Install Libraries
 
 
 ```
 $ pip install -U pip
 $ pip install -r requirements.txt
+
+---------------
+# fbprophet might cause some warning. If so,  
+# $ pip uninstall fbprophet
+# $ pip fbprophet
+# might solve this issue
+---------------
 ```
 
 
