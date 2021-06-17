@@ -40,7 +40,7 @@ $ pip install -r requirements.txt
 
 
   
-## Directory structure
+## Directory Structure
 
 ```
 .
