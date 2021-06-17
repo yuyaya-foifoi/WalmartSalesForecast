@@ -127,7 +127,7 @@ class Functions:
             
         return features
     
-    
+    @staticmethod
     def createLagFeatures(df, gp_cols=['Store','Dept'], target='Weekly_Sales', lags=[52, 104]):
         
         '''create lag feature
@@ -147,7 +147,7 @@ class Functions:
 
         return df
     
-    
+    @staticmethod
     def createDateStatsFeatures(df, variable, gp_cols, target='Weekly_Sales', funcs=['mean','median','max','min','std','sum']):
         
         '''create data aggregate features
@@ -171,7 +171,7 @@ class Functions:
             newdf = newdf.merge(tmp, on=gp_cols, how='left')
         return df.merge(newdf, on=gp_cols, how='left')
     
-    
+    @staticmethod
     def createClusteredFeatures(df, num_clusters=[3, 5, 10, 15, 20], remove_cols=['Date', 'Store', 'Dept', 'train_or_test']):
         
         '''create data clustered features
@@ -208,3 +208,78 @@ class Functions:
                 print('Cluster : ', unique[i], 'Nums : ', count[i])
                 
         return df
+    
+    @staticmethod
+    def regMissingValue(train_df, test_df, target_col = 'MarkDown1', remove_col = ['Date']):
+    
+        '''impute missing value by regression by other column values
+        Args:
+            train_df : 欠損値をxgbで回帰する関数
+            test_df : train_df, test_dfについて欠損値を埋めた列の値(list)
+            target_col : 学習用のdf
+            remove_col : 評価用のdf
+        Return:
+            train_target_values : Series
+            test_target_values : Series
+        '''
+
+
+        drops = list(set(train_df.columns) - set(test_df)) + remove_col
+        train_df = train_df.drop(drops, axis=1)
+        test_df = test_df.drop(remove_col, axis=1)
+
+        new_col = target_col + '_flg'
+        train_df[new_col] = np.isnan(train_df[target_col])
+        test_df[new_col] = np.isnan(test_df[target_col])
+
+        # 欠損あり
+        train_trues = train_df.groupby(new_col).get_group(True)
+
+        # 欠損なし
+        train_falses = train_df.groupby(new_col).get_group(False)
+
+        # flag列排除
+        train_trues = train_trues.drop(new_col, axis=1) ; train_falses = train_falses.drop(new_col, axis=1)
+
+        Y = train_falses[target_col]
+        X = train_falses.drop(target_col, axis=1)
+
+        X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, shuffle=True, random_state=2021)
+
+        XGB_REG = xgb.XGBRegressor()
+        XGB_REG.fit(X_train, y_train)
+        y_pred = XGB_REG.predict(X_test)
+
+        print('-'* 5, 'Show scores','-'* 5)
+        print("MAE: ", metrics.mean_absolute_error(y_test, y_pred)) #MAE
+        print("MSE: ", metrics.mean_squared_error(y_test, y_pred)) #MSE
+        print("RMSE: ", np.sqrt(metrics.mean_squared_error(y_test, y_pred))) #RMSE
+        print("R2: ", metrics.r2_score(y_test, y_pred))
+
+        # train_dfについて、欠損を含む行について推測した値を算出し、リスト化
+        train_target_values = []
+        for idx, td in tqdm(enumerate(range(len(train_df)))):
+
+            if np.isnan(train_df.loc[idx, :][target_col]) == True:
+                arr = np.array(train_df.loc[idx, :].drop([target_col, new_col]), dtype='float32')
+                x = arr.reshape(1, len(arr))
+                p = XGB_REG.predict(x)
+                train_target_values.append(p[0])
+
+            else:
+                train_target_values.append(train_df.loc[idx, :][target_col])
+
+        # test_dfについて、欠損を含む行について推測した値を算出し、リスト化
+        test_target_values = []
+        for idx, td in tqdm(enumerate(range(len(test_df)))):
+
+            if np.isnan(test_df.loc[idx, :][target_col]) == True:
+                arr = np.array(test_df.loc[idx, :].drop([target_col, new_col]), dtype='float32')
+                x = arr.reshape(1, len(arr))
+                p = XGB_REG.predict(x)
+                test_target_values.append(p[0])
+
+            else:
+                test_target_values.append(test_df.loc[idx, :][target_col])
+
+        return train_target_values, test_target_values
