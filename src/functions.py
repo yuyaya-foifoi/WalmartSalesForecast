@@ -214,10 +214,10 @@ class Functions:
     
         '''impute missing value by regression by other column values
         Args:
-            train_df : 欠損値をxgbで回帰する関数
-            test_df : train_df, test_dfについて欠損値を埋めた列の値(list)
-            target_col : 学習用のdf
-            remove_col : 評価用のdf
+            train_df : DataFrame
+            test_df : DataFrame
+            target_col : str
+            remove_col : str
         Return:
             train_target_values : Series
             test_target_values : Series
