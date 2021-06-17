@@ -32,7 +32,7 @@ $ pip install -U pip
 $ pip install -r requirements.txt
 
 ---------------
-# fbprophet might cause some warning. If so, executing command below might solve this issue.
+# fbprophet might cause some warning. If so, executing command below might solve.
 # $ pip uninstall fbprophet
 # $ pip fbprophet
 ---------------
